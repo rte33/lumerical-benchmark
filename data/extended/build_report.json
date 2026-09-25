@@ -1,0 +1,698 @@
+{
+ "seed": 2026,
+ "candidates": 2176,
+ "kept": 1536,
+ "rejected": 23,
+ "elapsed_s": 122.1,
+ "by_tier": {
+  "1": 900,
+  "2": 576,
+  "3": 60
+ },
+ "by_split": {
+  "train": 972,
+  "test": 564
+ },
+ "by_category": {
+  "arrays_and_lattices": {
+   "train": 360
+  },
+  "derived_coupler_layout": {
+   "train": 216
+  },
+  "derived_monitor_placement": {
+   "test": 180
+  },
+  "derived_sim_setup": {
+   "test": 144
+  },
+  "derived_stack_design": {
+   "train": 144
+  },
+  "derived_waveguide_geometry": {
+   "train": 216
+  },
+  "groups_and_parametrization": {
+   "test": 216
+  },
+  "simulation_spectra": {
+   "test": 24
+  },
+  "simulation_thin_films": {
+   "train": 36
+  }
+ },
+ "by_family": {
+  "add_drop": 36,
+  "dc": 36,
+  "double_ring": 36,
+  "mmi12": 36,
+  "mmi22": 36,
+  "ring_bus": 36,
+  "ar_coating": 36,
+  "fp_cavity": 36,
+  "qw_bilayer": 36,
+  "stack": 36,
+  "bend": 36,
+  "extents": 36,
+  "rib": 36,
+  "slot": 36,
+  "soi_strip": 36,
+  "taper_poly": 36,
+  "apodized_grating": 36,
+  "bullseye": 36,
+  "crow": 36,
+  "dbr_loop": 36,
+  "grating_teeth": 36,
+  "hex_w1": 36,
+  "nanobeam": 36,
+  "ngon_poly": 36,
+  "square_lattice": 36,
+  "wg_array": 36,
+  "ar_R": 12,
+  "slab_R": 12,
+  "slab_T": 12,
+  "box_monitors": 36,
+  "freq_points": 36,
+  "profile_slice": 36,
+  "time_probe": 36,
+  "tr_monitors": 36,
+  "fdtd_margins": 36,
+  "mesh_ppw": 36,
+  "sim_time": 36,
+  "source_band": 36,
+  "analysis_box": 36,
+  "arc_poly": 36,
+  "custom_material": 36,
+  "device_group": 36,
+  "global_settings": 36,
+  "group_script_pc": 36,
+  "dbr_peak": 12,
+  "fp_peak": 12
+ },
+ "sandbox_compatible": 720,
+ "assertions": 6783,
+ "reject_reasons": {
+  "soi_strip: assertion satisfied without its set() line (default value?)": 4,
+  "rib: assertion satisfied without its set() line (default value?)": 4,
+  "extents: assertion satisfied without its set() line (default value?)": 1,
+  "dc: assertion satisfied without its set() line (default value?)": 5,
+  "stack: assertion satisfied without its set() line (default value?)": 1,
+  "fdtd_margins: assertion satisfied without its set() line (default value?)": 2,
+  "mesh_ppw: assertion satisfied without its set() line (default value?)": 2,
+  "time_probe: assertion satisfied without its set() line (default value?)": 1,
+  "device_group: assertion satisfied without its set() line (default value?)": 3
+ },
+ "derived_value_leaks": [
+  {
+   "id": "ext-0273",
+   "family": "fp_cavity",
+   "props": [
+    "z span"
+   ]
+  },
+  {
+   "id": "ext-0282",
+   "family": "fp_cavity",
+   "props": [
+    "z span"
+   ]
+  },
+  {
+   "id": "ext-0404",
+   "family": "extents",
+   "props": [
+    "x"
+   ]
+  },
+  {
+   "id": "ext-0413",
+   "family": "extents",
+   "props": [
+    "y"
+   ]
+  },
+  {
+   "id": "ext-0417",
+   "family": "extents",
+   "props": [
+    "x",
+    "x"
+   ]
+  },
+  {
+   "id": "ext-0418",
+   "family": "extents",
+   "props": [
+    "y"
+   ]
+  },
+  {
+   "id": "ext-0423",
+   "family": "extents",
+   "props": [
+    "x"
+   ]
+  },
+  {
+   "id": "ext-0427",
+   "family": "extents",
+   "props": [
+    "x span"
+   ]
+  },
+  {
+   "id": "ext-0431",
+   "family": "extents",
+   "props": [
+    "x"
+   ]
+  },
+  {
+   "id": "ext-0443",
+   "family": "rib",
+   "props": [
+    "z span"
+   ]
+  },
+  {
+   "id": "ext-0468",
+   "family": "rib",
+   "props": [
+    "z span"
+   ]
+  },
+  {
+   "id": "ext-0470",
+   "family": "slot",
+   "props": [
+    "y"
+   ]
+  },
+  {
+   "id": "ext-0492",
+   "family": "slot",
+   "props": [
+    "y"
+   ]
+  },
+  {
+   "id": "ext-0498",
+   "family": "slot",
+   "props": [
+    "z"
+   ]
+  },
+  {
+   "id": "ext-0721",
+   "family": "grating_teeth",
+   "props": [
+    "z span"
+   ]
+  },
+  {
+   "id": "ext-0723",
+   "family": "grating_teeth",
+   "props": [
+    "z span"
+   ]
+  },
+  {
+   "id": "ext-0725",
+   "family": "grating_teeth",
+   "props": [
+    "z span"
+   ]
+  },
+  {
+   "id": "ext-0726",
+   "family": "grating_teeth",
+   "props": [
+    "z span"
+   ]
+  },
+  {
+   "id": "ext-0729",
+   "family": "grating_teeth",
+   "props": [
+    "z span"
+   ]
+  },
+  {
+   "id": "ext-0735",
+   "family": "grating_teeth",
+   "props": [
+    "z span"
+   ]
+  },
+  {
+   "id": "ext-0737",
+   "family": "grating_teeth",
+   "props": [
+    "x"
+   ]
+  },
+  {
+   "id": "ext-0739",
+   "family": "grating_teeth",
+   "props": [
+    "z span"
+   ]
+  },
+  {
+   "id": "ext-0740",
+   "family": "grating_teeth",
+   "props": [
+    "z span"
+   ]
+  },
+  {
+   "id": "ext-0743",
+   "family": "grating_teeth",
+   "props": [
+    "z span"
+   ]
+  },
+  {
+   "id": "ext-0744",
+   "family": "grating_teeth",
+   "props": [
+    "z span"
+   ]
+  },
+  {
+   "id": "ext-0745",
+   "family": "grating_teeth",
+   "props": [
+    "z span"
+   ]
+  },
+  {
+   "id": "ext-0747",
+   "family": "grating_teeth",
+   "props": [
+    "z span"
+   ]
+  },
+  {
+   "id": "ext-0756",
+   "family": "grating_teeth",
+   "props": [
+    "z span"
+   ]
+  },
+  {
+   "id": "ext-0802",
+   "family": "nanobeam",
+   "props": [
+    "x"
+   ]
+  },
+  {
+   "id": "ext-0869",
+   "family": "square_lattice",
+   "props": [
+    "x"
+   ]
+  },
+  {
+   "id": "ext-0876",
+   "family": "square_lattice",
+   "props": [
+    "x"
+   ]
+  },
+  {
+   "id": "ext-0878",
+   "family": "square_lattice",
+   "props": [
+    "x"
+   ]
+  },
+  {
+   "id": "ext-0880",
+   "family": "square_lattice",
+   "props": [
+    "x"
+   ]
+  },
+  {
+   "id": "ext-0886",
+   "family": "square_lattice",
+   "props": [
+    "x"
+   ]
+  },
+  {
+   "id": "ext-0892",
+   "family": "square_lattice",
+   "props": [
+    "x"
+   ]
+  },
+  {
+   "id": "ext-0905",
+   "family": "wg_array",
+   "props": [
+    "y span"
+   ]
+  },
+  {
+   "id": "ext-0916",
+   "family": "wg_array",
+   "props": [
+    "y span"
+   ]
+  },
+  {
+   "id": "ext-0919",
+   "family": "wg_array",
+   "props": [
+    "y",
+    "y span"
+   ]
+  },
+  {
+   "id": "ext-0921",
+   "family": "wg_array",
+   "props": [
+    "y span"
+   ]
+  },
+  {
+   "id": "ext-0923",
+   "family": "wg_array",
+   "props": [
+    "y span"
+   ]
+  },
+  {
+   "id": "ext-0925",
+   "family": "wg_array",
+   "props": [
+    "y span"
+   ]
+  },
+  {
+   "id": "ext-0926",
+   "family": "wg_array",
+   "props": [
+    "y span"
+   ]
+  },
+  {
+   "id": "ext-0928",
+   "family": "wg_array",
+   "props": [
+    "y span"
+   ]
+  },
+  {
+   "id": "ext-0936",
+   "family": "wg_array",
+   "props": [
+    "y"
+   ]
+  },
+  {
+   "id": "ext-0973",
+   "family": "box_monitors",
+   "props": [
+    "x span"
+   ]
+  },
+  {
+   "id": "ext-0994",
+   "family": "box_monitors",
+   "props": [
+    "y"
+   ]
+  },
+  {
+   "id": "ext-0995",
+   "family": "box_monitors",
+   "props": [
+    "z"
+   ]
+  },
+  {
+   "id": "ext-1003",
+   "family": "box_monitors",
+   "props": [
+    "x span"
+   ]
+  },
+  {
+   "id": "ext-1008",
+   "family": "box_monitors",
+   "props": [
+    "x span"
+   ]
+  },
+  {
+   "id": "ext-1048",
+   "family": "profile_slice",
+   "props": [
+    "z span"
+   ]
+  },
+  {
+   "id": "ext-1054",
+   "family": "profile_slice",
+   "props": [
+    "z span"
+   ]
+  },
+  {
+   "id": "ext-1069",
+   "family": "profile_slice",
+   "props": [
+    "z span"
+   ]
+  },
+  {
+   "id": "ext-1072",
+   "family": "profile_slice",
+   "props": [
+    "z span"
+   ]
+  },
+  {
+   "id": "ext-1074",
+   "family": "profile_slice",
+   "props": [
+    "z span"
+   ]
+  },
+  {
+   "id": "ext-1120",
+   "family": "tr_monitors",
+   "props": [
+    "x"
+   ]
+  },
+  {
+   "id": "ext-1133",
+   "family": "tr_monitors",
+   "props": [
+    "x"
+   ]
+  },
+  {
+   "id": "ext-1142",
+   "family": "tr_monitors",
+   "props": [
+    "x"
+   ]
+  },
+  {
+   "id": "ext-1148",
+   "family": "tr_monitors",
+   "props": [
+    "x"
+   ]
+  },
+  {
+   "id": "ext-1150",
+   "family": "tr_monitors",
+   "props": [
+    "x"
+   ]
+  },
+  {
+   "id": "ext-1191",
+   "family": "mesh_ppw",
+   "props": [
+    "y span"
+   ]
+  },
+  {
+   "id": "ext-1305",
+   "family": "analysis_box",
+   "props": [
+    "x",
+    "y"
+   ]
+  },
+  {
+   "id": "ext-1326",
+   "family": "analysis_box",
+   "props": [
+    "x",
+    "y"
+   ]
+  },
+  {
+   "id": "ext-1407",
+   "family": "device_group",
+   "props": [
+    "z"
+   ]
+  },
+  {
+   "id": "ext-1421",
+   "family": "device_group",
+   "props": [
+    "z"
+   ]
+  },
+  {
+   "id": "ext-1480",
+   "family": "group_script_pc",
+   "props": [
+    "benchzzm"
+   ]
+  },
+  {
+   "id": "ext-1483",
+   "family": "group_script_pc",
+   "props": [
+    "benchzzm"
+   ]
+  },
+  {
+   "id": "ext-1485",
+   "family": "group_script_pc",
+   "props": [
+    "benchzzm"
+   ]
+  }
+ ],
+ "rejected_examples": [
+  {
+   "family": "soi_strip",
+   "reason": "assertion satisfied without its set() line (default value?): {'target': 'core', 'prop': 'z span', 'val': 6.000000000000001e-07, 'tol': 1e-12}",
+   "question": "Write a Lumerical script to build a strip waveguide on a buried-oxide layer. The BOX, named 'box', is 2 um thick (material 'SiO2 (Glass) - Palik'), spans 13 um "
+  },
+  {
+   "family": "soi_strip",
+   "reason": "assertion satisfied without its set() line (default value?): {'target': 'core', 'prop': 'z span', 'val': 6.000000000000001e-07, 'tol': 1e-12}",
+   "question": "Create a Lumerical FDTD script to build a strip waveguide on a buried-oxide layer. The BOX, named 'box', is 1 um thick (material 'SiO2 (Glass) - Palik'), spans "
+  },
+  {
+   "family": "soi_strip",
+   "reason": "assertion satisfied without its set() line (default value?): {'target': 'core', 'prop': 'z span', 'val': 6.000000000000001e-07, 'tol': 1e-12}",
+   "question": "Using the Lumerical scripting language, build a strip waveguide on a buried-oxide layer. The BOX, named 'box', is 2 um thick (material 'SiO2 (Glass) - Palik'), "
+  },
+  {
+   "family": "soi_strip",
+   "reason": "assertion satisfied without its set() line (default value?): {'target': 'core', 'prop': 'z span', 'val': 6.000000000000001e-07, 'tol': 1e-12}",
+   "question": "Write an Ansys Lumerical (.lsf) script that will build a strip waveguide on a buried-oxide layer. The BOX, named 'box', is 2 um thick (material 'SiO2 (Glass) - "
+  },
+  {
+   "family": "rib",
+   "reason": "assertion satisfied without its set() line (default value?): {'target': 'rib', 'prop': 'y span', 'val': 6.000000000000001e-07, 'tol': 1e-12}",
+   "question": "Using the Lumerical scripting language, model a silicon rib waveguide along x on top of an oxide surface at z = 0. The total silicon height at the rib is 250 nm"
+  },
+  {
+   "family": "rib",
+   "reason": "assertion satisfied without its set() line (default value?): {'target': 'rib', 'prop': 'y span', 'val': 6.000000000000001e-07, 'tol': 1e-12}",
+   "question": "Create a Lumerical FDTD script to model a silicon rib waveguide along x on top of an oxide surface at z = 0. The total silicon height at the rib is 250 nm and t"
+  },
+  {
+   "family": "rib",
+   "reason": "assertion satisfied without its set() line (default value?): {'target': 'rib', 'prop': 'y span', 'val': 6.000000000000001e-07, 'tol': 1e-12}",
+   "question": "Write an Ansys Lumerical (.lsf) script that will model a silicon rib waveguide along x on top of an oxide surface at z = 0. The total silicon height at the rib "
+  },
+  {
+   "family": "rib",
+   "reason": "assertion satisfied without its set() line (default value?): {'target': 'rib', 'prop': 'y span', 'val': 6.000000000000001e-07, 'tol': 1e-12}",
+   "question": "Write an Ansys Lumerical (.lsf) script that will model a silicon rib waveguide along x on top of an oxide surface at z = 0. The total silicon height at the rib "
+  },
+  {
+   "family": "extents",
+   "reason": "assertion satisfied without its set() line (default value?): {'target': 'pad', 'prop': 'y', 'val': 0.0, 'tol': 1e-10, 'derived': True}",
+   "question": "Write a Lumerical script to add a metal heater named 'heater' (material 'Au (Gold) - Palik') that extends from x = -20 um to x = 10.5 um, from y = -2 um to y = "
+  },
+  {
+   "family": "dc",
+   "reason": "assertion satisfied without its set() line (default value?): {'target': 'wg_top', 'prop': 'x', 'val': 0.0, 'tol': 1e-12}",
+   "question": "Create a Lumerical FDTD script to build the coupling section of a directional coupler: two parallel waveguides 'wg_top' (+y) and 'wg_bottom' (-y), each 560 nm w"
+  },
+  {
+   "family": "dc",
+   "reason": "assertion satisfied without its set() line (default value?): {'target': 'wg_top', 'prop': 'x', 'val': 0.0, 'tol': 1e-12}",
+   "question": "Using the Lumerical scripting language, build the coupling section of a directional coupler: two parallel waveguides 'wg_top' (+y) and 'wg_bottom' (-y), each 57"
+  },
+  {
+   "family": "dc",
+   "reason": "assertion satisfied without its set() line (default value?): {'target': 'wg_top', 'prop': 'x', 'val': 0.0, 'tol': 1e-12}",
+   "question": "Using the Lumerical scripting language, build the coupling section of a directional coupler: two parallel waveguides 'wg_top' (+y) and 'wg_bottom' (-y), each 41"
+  },
+  {
+   "family": "dc",
+   "reason": "assertion satisfied without its set() line (default value?): {'target': 'wg_top', 'prop': 'x', 'val': 0.0, 'tol': 1e-12}",
+   "question": "Write a Lumerical script to build the coupling section of a directional coupler: two parallel waveguides 'wg_top' (+y) and 'wg_bottom' (-y), each 440 nm wide an"
+  },
+  {
+   "family": "dc",
+   "reason": "assertion satisfied without its set() line (default value?): {'target': 'wg_top', 'prop': 'x', 'val': 0.0, 'tol': 1e-12}",
+   "question": "Write an Ansys Lumerical (.lsf) script that will build the coupling section of a directional coupler: two parallel waveguides 'wg_top' (+y) and 'wg_bottom' (-y)"
+  },
+  {
+   "family": "stack",
+   "reason": "assertion satisfied without its set() line (default value?): {'target': 'layer_3', 'prop': 'z span', 'val': 6.000000000000001e-07, 'tol': 1e-12}",
+   "question": "Create a Lumerical FDTD script to build a 3-layer planar stack. The layers are listed from bottom to top and are stacked without gaps, with the bottom of the fi"
+  },
+  {
+   "family": "fdtd_margins",
+   "reason": "assertion satisfied without its set() line (default value?): {'target': 'FDTD', 'prop': 'simulation time', 'val': 1e-12, 'tol': 1e-19}",
+   "question": "Using the Lumerical scripting language, set up a 3D simulation of a silicon disk. Add a disk 'disk' (material 'Si (Silicon) - Palik', radius 5.5 um, 400 nm thic"
+  },
+  {
+   "family": "fdtd_margins",
+   "reason": "assertion satisfied without its set() line (default value?): {'target': 'FDTD', 'prop': 'simulation time', 'val': 1e-12, 'tol': 1e-19}",
+   "question": "Create a Lumerical FDTD script to set up a 3D simulation of a silicon disk. Add a disk 'disk' (material 'Si (Silicon) - Palik', radius 7.5 um, 400 nm thick, res"
+  },
+  {
+   "family": "mesh_ppw",
+   "reason": "assertion satisfied without its set() line (default value?): {'target': 'slot_mesh', 'prop': 'y span', 'val': 8.000000000000001e-07, 'tol': 1e-10, 'derived': True}",
+   "question": "Write an Ansys Lumerical (.lsf) script that will add a mesh override region 'slot_mesh' around a 200 nm wide slot centered on y = 0 that runs along x. The regio"
+  },
+  {
+   "family": "mesh_ppw",
+   "reason": "assertion satisfied without its set() line (default value?): {'target': 'slot_mesh', 'prop': 'y span', 'val': 8.000000000000001e-07, 'tol': 1e-10, 'derived': True}",
+   "question": "Create a Lumerical FDTD script to add a mesh override region 'slot_mesh' around a 200 nm wide slot centered on y = 0 that runs along x. The region should extend"
+  },
+  {
+   "family": "time_probe",
+   "reason": "assertion satisfied without its set() line (default value?): {'target': 'probe_right', 'prop': 'y', 'val': 0.0, 'tol': 1e-12}",
+   "question": "Create a Lumerical FDTD script to add a ring 'ring' centered at (2.5 um, 0) with inner radius 5.5 um and outer radius 6.06 um (220 nm thick, centered at z = 110"
+  },
+  {
+   "family": "device_group",
+   "reason": "assertion satisfied without its set() line (default value?): {'target': 'device::core', 'prop': 'y span', 'val': 6.000000000000001e-07, 'tol': 1e-12}",
+   "question": "Write an Ansys Lumerical (.lsf) script that will create a structure group named 'device' whose origin is at (5 um, -7.5 um) and which is rotated by -45 degrees "
+  },
+  {
+   "family": "device_group",
+   "reason": "assertion satisfied without its set() line (default value?): {'target': 'device::core', 'prop': 'y span', 'val': 6.000000000000001e-07, 'tol': 1e-12}",
+   "question": "Write a Lumerical script to create a structure group named 'device' whose origin is at (10 um, -3.5 um) and which is rotated by -30 degrees about the z axis. In"
+  },
+  {
+   "family": "device_group",
+   "reason": "assertion satisfied without its set() line (default value?): {'target': 'device::core', 'prop': 'x', 'val': 0.0, 'tol': 1e-12}",
+   "question": "Using the Lumerical scripting language, create a structure group named 'device' whose origin is at (5.5 um, 0) and which is rotated by 90 degrees about the z ax"
+  }
+ ]
+}

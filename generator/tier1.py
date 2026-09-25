@@ -60,7 +60,7 @@ def rib(rng: random.Random):
             + obj("addrect", "rib", [("x", 0.0), ("x span", L), ("y", 0.0), ("y span", w),
                                      ("z", "tslab + etch/2"), ("z span", "etch"), ("material", q(SI))]))
     asserts = [A("slab", "z span", H - e, True), A("slab", "z", (H - e) / 2, True),
-               A("rib", "z span", e, True), A("rib", "z", H - e / 2, True), A("rib", "y span", w)]
+               A("rib", "z span", e), A("rib", "z", H - e / 2, True), A("rib", "y span", w)]
     return task(CAT_WG, "rib", 1, qn, code, asserts)
 
 
@@ -153,10 +153,10 @@ def bend(rng: random.Random):
                                       ("z", 110 * NM), ("z span", 220 * NM), ("material", q(SI))])
             + obj("addrect", "wg_out", [("x", "R"), ("x span", "w"), ("y", "s*(R + Lout/2)"), ("y span", "Lout"),
                                         ("z", 110 * NM), ("z span", 220 * NM), ("material", q(SI))]))
-    asserts = [A("bend", "y", sgn * R, True), A("bend", "inner radius", R - w / 2, True),
+    asserts = [A("bend", "y", sgn * R), A("bend", "inner radius", R - w / 2, True),
                A("bend", "outer radius", R + w / 2, True),
                A("bend", "theta start", -90.0) if sgn > 0 else A("bend", "theta stop", 90.0),
-               A("wg_out", "x", R, True), A("wg_out", "y", sgn * (R + Lout / 2), True)]
+               A("wg_out", "x", R), A("wg_out", "y", sgn * (R + Lout / 2), True)]
     return task(CAT_WG, "bend", 1, qn, code, asserts)
 
 
@@ -468,8 +468,8 @@ def sim_time(rng: random.Random):
     L = grid(rng, 10, 200, 5) * UM
     ng = pick(rng, [1.5, 2.0, 3.0, 4.2, 4.3, 4.5])
     k = pick(rng, [2, 3, 4, 5])
-    acc = rng.randint(1, 4)
-    shut = pick(rng, [1e-4, 1e-5, 1e-6])
+    acc = pick(rng, [1, 3, 4, 5])  # 2 is the default
+    shut = pick(rng, [1e-4, 5e-5, 1e-6, 1e-7])  # 1e-5 is the default
     T = k * L * ng / C0
     qn = (f"{pick(rng, OPENERS)} add a 2D FDTD region (default name 'FDTD') spanning {hl(L + 2 * UM)} in x and "
           f"{hl(4 * UM)} in y, centered at the origin, for a device of length {hl(L)} with group index {ng}. "
@@ -535,28 +535,34 @@ def box_monitors(rng: random.Random):
                 props += [(ip, f"c{ip}"), (f"{ip} span", "2*hw")]
             code += obj("addpower", f"{ax}{i}", props)
     asserts = [A("x1", "x", c[0] - h, True), A("y2", "y", c[1] + h, True), A("z1", "z", c[2] - h, True),
-               A("z2", "x span", 2 * h, True), A("x2", "z", c[2], True), A("y1", "monitor type", "2D Y-normal")]
+               A("z2", "x span", 2 * h, True), A("x2", "z", c[2]), A("y1", "monitor type", "2D Y-normal")]
     return task(CAT_MON, "box_monitors", 1, qn, code, asserts)
 
 
 def profile_slice(rng: random.Random):
     tb = pick(rng, [0.0, 1 * UM, 2 * UM, 3 * UM])
-    t = pick(rng, [220, 250, 300, 400, 600]) * NM
-    X, Y, Z = grid(rng, 4, 30, 1) * UM, grid(rng, 2.5, 8, 0.5) * UM, pick(rng, [1.5, 2.5, 3, 3.5, 4]) * UM
+    t = pick(rng, [220, 250, 300, 400])
+    t = t * NM
+    X, Y = grid(rng, 4, 30, 1) * UM, grid(rng, 2.5, 8, 0.5) * UM
+    below, above = grid(rng, 0.5, 2.5, 0.5) * UM, grid(rng, 0.5, 2.5, 0.5) * UM
+    if below == above:
+        above += 0.5 * UM
+    z0, z1 = tb - below, tb + t + above
     zf = tb + t / 2
     base = "z = 0" if tb == 0 else f"z = {hl(tb)}"
     qn = (f"{pick(rng, OPENERS)} add two frequency-domain field profile monitors for a waveguide whose "
           f"{hl(t)} thick core has its bottom surface at {base}. The FDTD region (already defined elsewhere) "
-          f"spans {hl(X)} x {hl(Y)} x {hl(Z)} centered at (0, 0, {hl(zf)}). 'field_xy' is a '2D Z-normal' "
-          f"monitor through the vertical middle of the core covering the full x and y extent of the region. "
-          f"'field_xz' is a '2D Y-normal' monitor at y = 0 covering the full x and z extent of the region.")
-    code = (f"tb = {lit(tb)}; t = {lit(t)}; zc = tb + t/2;\n"
+          f"spans {hl(X)} in x and {hl(Y)} in y, centered at x = y = 0, and extends from z = {hl(z0)} to "
+          f"z = {hl(z1)}. 'field_xy' is a '2D Z-normal' monitor through the vertical middle of the core "
+          f"covering the full x and y extent of the region. 'field_xz' is a '2D Y-normal' monitor at y = 0 "
+          f"covering the full x and z extent of the region.")
+    code = (f"tb = {lit(tb)}; t = {lit(t)}; z0 = {lit(z0)}; z1 = {lit(z1)};\n"
             + obj("addprofile", "field_xy", [("monitor type", q("2D Z-normal")), ("x", 0.0), ("x span", X),
-                                             ("y", 0.0), ("y span", Y), ("z", "zc")])
+                                             ("y", 0.0), ("y span", Y), ("z", "tb + t/2")])
             + obj("addprofile", "field_xz", [("monitor type", q("2D Y-normal")), ("x", 0.0), ("x span", X),
-                                             ("y", 0.0), ("z", "zc"), ("z span", Z)]))
-    asserts = [A("field_xy", "z", zf, True), A("field_xy", "y span", Y), A("field_xz", "z", zf, True),
-               A("field_xz", "z span", Z), A("field_xz", "monitor type", "2D Y-normal")]
+                                             ("y", 0.0), ("z min", "z0"), ("z max", "z1")]))
+    asserts = [A("field_xy", "z", zf, True), A("field_xy", "y span", Y), A("field_xz", "z", (z0 + z1) / 2, True),
+               A("field_xz", "z span", z1 - z0, True), A("field_xz", "monitor type", "2D Y-normal")]
     return task(CAT_MON, "profile_slice", 1, qn, code, asserts)
 
 
@@ -598,8 +604,8 @@ def time_probe(rng: random.Random):
                                              ("z", 110 * NM)])
             + obj("addtime", "probe_top", [("monitor type", q("Point")), ("x", "cx"), ("y", "cy + rc"),
                                            ("z", 110 * NM)]))
-    asserts = [A("probe_right", "x", cx + rc, True), A("probe_right", "y", cy, True),
-               A("probe_top", "y", cy + rc, True), A("probe_top", "z", 110 * NM, True)]
+    asserts = [A("probe_right", "x", cx + rc, True), A("probe_right", "y", cy),
+               A("probe_top", "y", cy + rc, True), A("probe_top", "z", 110 * NM)]
     return task(CAT_MON, "time_probe", 1, qn, code, asserts)
 
 

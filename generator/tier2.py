@@ -270,7 +270,7 @@ def nanobeam(rng: random.Random):
               "  set(\"x\", x); set(\"y\", 0); set(\"radius\", rmin + (rmax-rmin)*(abs(x)-a/2)/((M-1)*a));\n"
               "  set(\"z\", 110e-9); set(\"z span\", 220e-9); set(\"material\", \"etch\");\n}\n")
     k = rng.randint(2, M - 1)
-    asserts = [A("hole_1", "radius", rmax, True), A(f"hole_{M}", "radius", rmin, True),
+    asserts = [A("hole_1", "radius", rmax), A(f"hole_{M}", "radius", rmin),
                A(f"hole_{k}", "radius", rk(xs[k - 1]), True), A(f"hole_{M + 1}", "x", a / 2, True),
                A(f"hole_{2 * M}", "x", xs[-1], True), _none(f"hole_{2 * M + 1}")]
     return task(CAT_ARR, "nanobeam", 2, qn, code, asserts)
@@ -299,7 +299,7 @@ def group_script_pc(rng: random.Random):
             f'adduserprop("nx", 0, {nx});\nadduserprop("ny", 0, {ny});\n'
             f'set("script", "{script}");\n')
     s_x, e_x = extreme_setup("pc::hole", "x", "max")
-    asserts = [A("pc", "a", a), A("pc", "nx", nx), A("pc", "x", gx),
+    asserts = [A("pc", "a", a), A("pc", "nx", nx), A("pc", "x", gx) if gx != 0 else A("pc", "y", gy),
                E('getnamednumber("pc::hole")', nx * ny, setup="runsetup;"),
                E(e_x, (nx - 1) / 2 * a, setup="runsetup; " + s_x, derived=True),
                E('getnamed("pc::hole","radius")', r, setup="runsetup;")]
@@ -338,7 +338,7 @@ def custom_material(rng: random.Random):
 
 def analysis_box(rng: random.Random):
     cx, cy = grid(rng, -3, 3, 0.5) * UM, grid(rng, -3, 3, 0.5) * UM
-    hw = grid(rng, 0.3, 2, 0.1) * UM
+    hw = pick(rng, [v / 10 for v in range(3, 21) if v != 10]) * UM  # 1 um -> 2 um span is the default
     gname = pick(rng, ["box", "scat_box", "flux_box", "power_box"])
     qn = (f"{pick(rng, OPENERS)} create an analysis group named '{gname}' centered at ({hl(cx)}, {hl(cy)}) and "
           f"place inside it four power monitors forming a closed square of side {hl(2 * hw)} around that "
@@ -354,7 +354,7 @@ def analysis_box(rng: random.Random):
         code += "".join(f'set("{p}", {v if isinstance(v, str) else lit(v)});\n' for p, v in
                         [("monitor type", q(mt))] + props)
     asserts = [A(gname, "x", cx), A(f"{gname}::m_right", "x", hw, True), A(f"{gname}::m_bottom", "y", -hw, True),
-               A(f"{gname}::m_top", "x span", 2 * hw, True), A(f"{gname}::m_left", "monitor type", "2D X-normal"),
+               A(f"{gname}::m_top", "x span", 2 * hw), A(f"{gname}::m_left", "monitor type", "2D X-normal"),
                E(f'getnamednumber("{gname}::m_top")', 1)]
     if cx == 0:
         asserts[0] = A(gname, "y", cy) if cy != 0 else E(f'getnamednumber("{gname}")', 1)

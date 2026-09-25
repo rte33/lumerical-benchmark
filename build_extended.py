@@ -56,7 +56,16 @@ def perturb(a: dict):
 
 
 def strip_prop_lines(code: str, prop: str) -> str:
-    return re.sub(r'set\(\s*"' + re.escape(prop) + r'"\s*,[^;]*\);', "", code, flags=re.I)
+    """Remove every set() that can determine `prop`.
+
+    A position/span along an axis can be set via x, x span, x min or x max, so all four
+    are removed together; otherwise a value set through min/max would look like a default.
+    """
+    m = re.fullmatch(r"([xyz])( span)?", prop.strip().lower())
+    props = [f"{m.group(1)}{s}" for s in ("", " span", " min", " max")] if m else [prop]
+    for p in props:
+        code = re.sub(r'set\(\s*"' + re.escape(p) + r'"\s*,[^;]*\);', "", code, flags=re.I)
+    return code
 
 
 def gate(t: dict) -> tuple[bool, str, dict]:
