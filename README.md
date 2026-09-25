@@ -3,6 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![Tasks: 160](https://img.shields.io/badge/tasks-160%20verified-green.svg)](data/lumerical.jsonl)
+[![Extended: 1536](https://img.shields.io/badge/extended-1536%20verified-green.svg)](data/extended/lumerical_ext.jsonl)
 [![Ansys Lumerical](https://img.shields.io/badge/Ansys-Lumerical%20FDTD-orange.svg)](https://www.ansys.com/products/optics/fdtd)
 
 An open benchmark dataset and execution harness for evaluating Large Language Models on **Ansys Lumerical Scripting Language (`.lsf`)** for Photonic Integrated Circuit (PIC) layout and FDTD simulation automation.
@@ -149,6 +150,84 @@ python verify.py --engine real
 ```
 
 *(Set `LUMERICAL_BIN` and `LUMERICAL_API` environment variables if installed in custom directories).*
+
+---
+
+## 🧩 Extended Dataset (Tiers 1–3)
+
+The core 160 tasks stay frozen for comparability. On top of them, `data/extended/` holds **1,536 procedurally generated tasks** that are considerably harder: in the core set every value is given verbatim and almost every gold line is a `set(...)` call; the extended set requires derivation, programming and simulation.
+
+| Tier | What the model must do | Tasks | Graded on |
+|---|---|---|---|
+| **1 — Derived values** | Turn design intent into coordinates: gaps → centers, stacking order → z positions, quarter-wave / Fabry–Pérot thicknesses, THz → wavelength, cells-per-wavelength → mesh step, margins → region spans | 900 | sandbox or real |
+| **2 — Programmatic structures** | Loops with computed object names, photonic-crystal lattices (incl. W1 defects), gratings (uniform and apodized), polygon vertex generation, structure groups with user properties and setup scripts, analysis groups, custom materials, global settings | 576 | real engine |
+| **3 — Simulate & extract** | Build a fully specified 2D FDTD simulation, `run` it, post-process monitor data (`transmission`, `interp`, peak search) and leave a named result variable | 60 | real engine + solver |
+
+Categories are split disjointly between train and test (no category appears in both):
+
+| Split | Tier | Category | Tasks | Families |
+|---|---|---|---|---|
+| **Train** | 1 | `derived_coupler_layout` | 216 | add_drop, dc, double_ring, mmi12, mmi22, ring_bus |
+| **Train** | 1 | `derived_stack_design` | 144 | ar_coating, fp_cavity, qw_bilayer, stack |
+| **Train** | 1 | `derived_waveguide_geometry` | 216 | bend, extents, rib, slot, soi_strip, taper_poly |
+| **Train** | 2 | `arrays_and_lattices` | 360 | apodized_grating, bullseye, crow, dbr_loop, grating_teeth, hex_w1, nanobeam, ngon_poly, square_lattice, wg_array |
+| **Train** | 3 | `simulation_thin_films` | 36 | ar_R, slab_R, slab_T |
+| **Test** | 1 | `derived_monitor_placement` | 180 | box_monitors, freq_points, profile_slice, time_probe, tr_monitors |
+| **Test** | 1 | `derived_sim_setup` | 144 | fdtd_margins, mesh_ppw, sim_time, source_band |
+| **Test** | 2 | `groups_and_parametrization` | 216 | analysis_box, arc_poly, custom_material, device_group, global_settings, group_script_pc |
+| **Test** | 3 | `simulation_spectra` | 24 | dbr_peak, fp_peak |
+
+- `data/extended/lumerical_ext.jsonl` (all), `lumerical_ext_train.jsonl`, `lumerical_ext_test.jsonl`
+- `data/extended/build_report.json` — per-family counts, gate statistics, rejection reasons
+
+Extended records add `tier`, `family`, `requires_real_engine` (720 tasks are also gradable by the offline sandbox), and, for tier 3, `timeout` and `reference` (the FDTD result and the analytic transfer-matrix value it was checked against).
+
+```python
+from loader import load_dataset
+hard = load_dataset("test", dataset="extended", tier=2)
+everything = load_dataset("all", dataset="combined")
+```
+
+```bash
+python verify.py --engine real --dataset extended            # all tiers
+python verify.py --dataset extended                          # sandbox-gradable subset only
+python verify.py --engine real --dataset extended --tier 3   # simulation tasks
+```
+
+### New assertion types
+
+```json
+{"target": "hole_1_1", "prop": "x", "val": -1.2e-06, "tol": 1e-10}
+{"type": "expr", "expr": "getnamednumber(\"hole\")", "val": 78}
+{"type": "expr", "expr": "benchzzm", "setup": "<LSF loop computing max x over all 'hole' objects>", "val": 2.86e-06, "tol": 1e-10}
+{"type": "expr", "expr": "T_film", "val": 0.8102, "tol": 0.01}
+```
+
+- `expr` evaluates any LSF expression in the live session after the script ran (object counts, group children, material database entries, result variables). An optional `setup` block enables **order-independent** checks over many identically named objects.
+- Numeric checks accept `tol` (absolute) and `rtol` (relative). Values the model has to derive use 0.1 nm tolerance so an honest one-decimal rounding still passes; values stated in the question use 1 pm.
+
+### How every generated task is validated
+
+`build_extended.py` regenerates the set deterministically (seeded) and keeps a candidate only if, on the real engine:
+
+1. the gold script runs without error and passes all assertions;
+2. **mutation control** — each assertion, perturbed well outside its tolerance, fails;
+3. **null control** — the assertion set fails on an empty project;
+4. **defaults control** — removing the gold script's matching `set(...)` line makes the assertion fail, so no assertion is satisfied by a Lumerical default value;
+5. tier 3: the FDTD result agrees with the exact transfer-matrix solution (|ΔR|, |ΔT| ≤ 0.02; peak wavelength ≤ 0.5 %) and is reproduced by a second run.
+
+```bash
+python build_extended.py                    # full rebuild (~25 min, needs Lumerical)
+python build_extended.py --per-family 3     # smoke build
+```
+
+### Real-engine harness hardening
+
+- Lumerical runs in a **worker process**; a hung script is killed after its timeout and the session restarts, instead of blocking the whole evaluation.
+- A `save` is injected before `run`/`runsweep` when the project is unsaved — otherwise Lumerical opens a modal *Save as* dialog (even when hidden) and the API blocks indefinitely.
+- Script variables are **cleared between tasks** (`newproject` keeps them), so a result variable from one task can no longer satisfy the next.
+- Benchmark simulations run as a **single MPI process**: the worker temporarily sets the FDTD resource to 1 process and restores your value on exit (a backup in `~/.lumbench_fdtd_processes_backup.json` makes this crash-safe). Tier-3 grids are tiny, so splitting them across ranks is slower, and one busy core throttles every rank — a 3.5 s task took 144 s as 6 ranks on a loaded 6-core machine. Set `LUMBENCH_KEEP_RESOURCES=1` to leave your configuration untouched.
+- Failures report Lumerical's own error text (e.g. `in set, the requested property 'widht' was not found`) instead of the generic `Failed to evaluate code`.
 
 ---
 
