@@ -9,9 +9,12 @@ Supports two execution backends:
 """
 from __future__ import annotations
 
+import atexit
 import os
 import re
+import shutil
 import sys
+import tempfile
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Set, Tuple
 
@@ -358,16 +361,29 @@ class LumericalSimulator:
         return f"Error: line {line_idx}: command '{cmd}' is unknown or not recognized."
 
 
-# Persistent session reference for live CAD evaluation
-_REAL_LUMERICAL_SESSION = None
+# ---------------------------------------------------------------------------
+# Real Ansys Lumerical engine
+#
+# lumapi is driven from a dedicated worker process (`python executor.py
+# --lumerical-worker`). A blocked lumapi call cannot be interrupted, and once
+# one hangs no new session can be opened in the same process, so on timeout
+# the harness kills the worker (and its Lumerical child) and starts a new one.
+# ---------------------------------------------------------------------------
+
+# Name of the harness-internal LSF variable used to evaluate "expr" assertions.
+# (LSF identifiers may not begin with an underscore.)
+_BENCH_VAR = "benchzzval"
+
+# `run;` / `run("FDTD");` / `runsweep;` statements. Lumerical opens a modal "Save as"
+# dialog when an unsaved project is run -- even in hidden mode -- which blocks the API
+# indefinitely, so a save guard is injected in front of every run statement.
+_RUN_STMT = re.compile(r"(?<![\w\"'.])(run|runsweep)\b(\s*\([^;\n]*\))?\s*(;|$)", re.I | re.M)
+
+_STARTUP_TIMEOUT = 180.0
 
 
 def get_real_lumerical_session():
-    """Retrieve or initialize a persistent headless Ansys Lumerical FDTD session."""
-    global _REAL_LUMERICAL_SESSION
-    if _REAL_LUMERICAL_SESSION is not None:
-        return _REAL_LUMERICAL_SESSION
-
+    """Open an in-process headless Ansys Lumerical FDTD session (used by the worker)."""
     bin_path = os.environ.get("LUMERICAL_BIN", r"G:\Users\fardo\Lumerical_main_inst_26\bin")
     api_path = os.environ.get("LUMERICAL_API", r"G:\Users\fardo\Lumerical_main_inst_26\api\python")
 
@@ -377,8 +393,268 @@ def get_real_lumerical_session():
         sys.path.insert(0, api_path)
 
     import lumapi
-    _REAL_LUMERICAL_SESSION = lumapi.FDTD(hide=True)
-    return _REAL_LUMERICAL_SESSION
+    return lumapi.FDTD(hide=True)
+
+
+def _last_lumerical_error(fdtd) -> str:
+    """Fetch the interpreter's own error text; lumapi only raises 'Failed to evaluate code'."""
+    try:
+        e = fdtd.handle.iapi.appGetLastError()
+        return e.contents.str[: e.contents.len].decode("utf-8", "replace").strip()
+    except Exception:
+        return ""
+
+
+def _inject_save_guard(code: str, save_path: str) -> str:
+    guard = f'if(currentfilename==""){{save("{save_path}");}} '
+    return _RUN_STMT.sub(lambda m: guard + m.group(0), code)
+
+
+def _to_plain(value: Any) -> Any:
+    """Convert lumapi return values (numpy arrays/scalars) into plain Python objects."""
+    if hasattr(value, "tolist"):
+        if getattr(value, "size", 2) == 1:
+            return value.flatten()[0].item() if hasattr(value, "flatten") else value.item()
+        return value.tolist()
+    return value
+
+
+def _worker_main() -> None:
+    """Entry point of the Lumerical worker process."""
+    from multiprocessing.connection import Listener
+
+    authkey = bytes.fromhex(sys.stdin.readline().strip())
+    listener = Listener(("127.0.0.1", 0), authkey=authkey)
+    print(listener.address[1], flush=True)
+    # Keep stray Lumerical console output from filling the parent's pipe.
+    devnull = os.open(os.devnull, os.O_WRONLY)
+    os.dup2(devnull, 1)
+    conn = listener.accept()
+
+    tmpdir = tempfile.mkdtemp(prefix="lumbench_")
+    save_path = os.path.join(tmpdir, "bench_task.fsp").replace("\\", "/")
+    try:
+        fdtd = get_real_lumerical_session()
+    except Exception as e:
+        conn.send(("err", f"could not start Lumerical: {e}"))
+        return
+    conn.send(("ok", "ready"))
+
+    def failure(e: Exception) -> tuple:
+        detail = _last_lumerical_error(fdtd) if "Failed to evaluate" in str(e) else ""
+        return ("err", detail or str(e))
+
+    try:
+        while True:
+            try:
+                op, arg = conn.recv()
+            except (EOFError, OSError):
+                break
+            try:
+                if op == "exec":
+                    fdtd.newproject()
+                    fdtd.eval(_inject_save_guard(arg, save_path))
+                    reply = ("ok", None)
+                elif op == "getnamed":
+                    reply = ("ok", _to_plain(fdtd.getnamed(*arg)))
+                elif op == "expr":
+                    fdtd.eval(f"{_BENCH_VAR} = {arg};")
+                    reply = ("ok", _to_plain(fdtd.getv(_BENCH_VAR)))
+                elif op == "eval":
+                    fdtd.eval(arg)
+                    reply = ("ok", None)
+                elif op == "getv":
+                    reply = ("ok", _to_plain(fdtd.getv(arg)))
+                else:
+                    reply = ("err", f"unknown worker op '{op}'")
+            except Exception as e:
+                reply = failure(e)
+            conn.send(reply)
+    finally:
+        try:
+            fdtd.close()
+        except Exception:
+            pass
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+class _LumericalWorker:
+    """Parent-side handle of a Lumerical worker process."""
+
+    def __init__(self):
+        import secrets
+        import subprocess
+        from multiprocessing.connection import Client
+
+        authkey = secrets.token_bytes(16)
+        self.proc = subprocess.Popen(
+            [sys.executable, os.path.abspath(__file__), "--lumerical-worker"],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            text=True,
+        )
+        self.proc.stdin.write(authkey.hex() + "\n")
+        self.proc.stdin.flush()
+        port = self.proc.stdout.readline().strip()
+        if not port:
+            self.kill()
+            raise RuntimeError("Lumerical worker failed to start")
+        self.conn = Client(("127.0.0.1", int(port)), authkey=authkey)
+        status, info = self._recv(_STARTUP_TIMEOUT)
+        if status != "ok":
+            self.kill()
+            raise RuntimeError(info)
+
+    def _recv(self, timeout: Optional[float]):
+        if not self.conn.poll(timeout):
+            self.kill()
+            raise TimeoutError(f"Lumerical did not finish within {timeout:g}s (session restarted)")
+        try:
+            return self.conn.recv()
+        except (EOFError, OSError):
+            self.kill()
+            raise RuntimeError("Lumerical worker exited unexpectedly (session restarted)")
+
+    def request(self, op: str, arg: Any, timeout: Optional[float]):
+        self.conn.send((op, arg))
+        return self._recv(timeout)
+
+    def close(self) -> None:
+        """Let the worker close Lumerical cleanly (releases the license); kill if it lingers."""
+        try:
+            self.conn.close()
+            self.proc.wait(15)
+        except Exception:
+            self.kill()
+
+    def kill(self) -> None:
+        global _WORKER
+        try:
+            import psutil
+            procs = psutil.Process(self.proc.pid).children(recursive=True)
+        except Exception:
+            procs = []
+        for p in procs:
+            try:
+                p.kill()
+            except Exception:
+                pass
+        try:
+            self.proc.kill()
+        except Exception:
+            pass
+        if _WORKER is self:
+            _WORKER = None
+
+
+_WORKER: Optional[_LumericalWorker] = None
+
+
+def _worker() -> _LumericalWorker:
+    global _WORKER
+    if _WORKER is None:
+        _WORKER = _LumericalWorker()
+        atexit.register(_WORKER.close)
+    return _WORKER
+
+
+def real_lumerical_request(op: str, arg: Any, timeout: Optional[float] = 10.0):
+    """Send one operation to the live session: 'exec', 'getnamed', 'expr', 'eval', 'getv'.
+
+    Returns (status, value) where status is 'ok' or 'err'. Raises TimeoutError /
+    RuntimeError if the session had to be restarted.
+    """
+    return _worker().request(op, arg, timeout)
+
+
+def _flatten(values: Any) -> List[Any]:
+    if isinstance(values, (list, tuple)):
+        out: List[Any] = []
+        for v in values:
+            out.extend(_flatten(v))
+        return out
+    return [values]
+
+
+def _compare(label: str, expected: Any, actual: Any, ass: dict) -> Optional[str]:
+    """Return an error message if `actual` does not match the assertion, else None."""
+    rtol = float(ass.get("rtol", 0.0))
+    tol = float(ass.get("tol", 0.0 if "rtol" in ass else 1e-6))
+
+    if isinstance(expected, list):
+        flat_exp, flat_act = _flatten(expected), _flatten(actual)
+        if len(flat_act) != len(flat_exp):
+            return f"assertion failed: '{label}' expected {len(flat_exp)} values, got {len(flat_act)}"
+        for e_v, a_v in zip(flat_exp, flat_act):
+            try:
+                if abs(float(a_v) - e_v) > tol + rtol * abs(e_v):
+                    return f"assertion failed: '{label}' expected {expected}, got {actual}"
+            except (TypeError, ValueError):
+                return f"assertion failed: '{label}' expected {expected}, got {actual}"
+        return None
+
+    if isinstance(expected, (int, float)):
+        try:
+            act_num = float(actual)
+        except (TypeError, ValueError):
+            return f"assertion failed: '{label}' expected {expected}, got {actual!r}"
+        if abs(act_num - expected) > tol + rtol * abs(expected):
+            bound = f"+/- {tol:g}" + (f" + {rtol:g} rel" if rtol else "")
+            return f"assertion failed: '{label}' expected {expected} ({bound}), got {actual}"
+        return None
+
+    if isinstance(expected, str) and isinstance(actual, str):
+        if actual.strip().lower() != expected.strip().lower():
+            return f"assertion failed: '{label}' expected '{expected}', got '{actual}'"
+        return None
+
+    if actual != expected:
+        return f"assertion failed: '{label}' expected {expected}, got {actual}"
+    return None
+
+
+def check_real_assertions(test_assertions: list[dict] | None, timeout: float = 10.0) -> Optional[str]:
+    """Check assertions against the current state of the live session.
+
+    Assertion kinds:
+      {"target": obj, "prop": p, "val": v}             -- getnamed(obj, p) == v
+      {"type": "expr", "expr": "<lsf expr>", "val": v}  -- value of an LSF expression, e.g.
+          'getnamednumber("hole")' or a result variable left by the script ('T1550').
+    Numeric checks accept "tol" (absolute, default 1e-6) and/or "rtol" (relative).
+    """
+    for ass in test_assertions or []:
+        expected = ass.get("val")
+        try:
+            if ass.get("type") == "expr":
+                label = ass["expr"]
+                status, actual = real_lumerical_request("expr", ass["expr"], timeout)
+                if status != "ok":
+                    return f"assertion failed: could not evaluate '{label}': {actual}"
+            else:
+                target = ass.get("target")
+                prop = ass.get("prop", "").lower().strip()
+                label = f"{target}.{prop}"
+                status, actual = real_lumerical_request("getnamed", (target, prop), timeout)
+                if status != "ok":
+                    return f"assertion failed: could not query '{label}': {actual}"
+        except (TimeoutError, RuntimeError) as e:
+            return f"RuntimeError: {e}"
+        err = _compare(label, expected, actual, ass)
+        if err:
+            return err
+    return None
+
+
+def execute_real_lumerical(code: str, timeout: float = 10.0) -> Optional[str]:
+    """Run a script in a fresh project of the live session. Returns an error string or None."""
+    code = (code or "").strip()
+    if not code:
+        return "Error: empty Lumerical script submission"
+    try:
+        status, info = real_lumerical_request("exec", code, timeout)
+    except (TimeoutError, RuntimeError) as e:
+        return f"RuntimeError: {e}"
+    return None if status == "ok" else f"RuntimeError: {info}"
 
 
 def run_real_lumerical(
@@ -387,63 +663,12 @@ def run_real_lumerical(
     timeout: float = 10.0,
 ) -> ExecResult:
     """Execute Lumerical .lsf code directly in installed Ansys Lumerical FDTD software."""
-    code = (code or "").strip()
-    if not code:
-        return ExecResult(False, None, "Error: empty Lumerical script submission")
-
-    try:
-        fdtd = get_real_lumerical_session()
-        fdtd.newproject()
-        fdtd.eval(code)
-    except Exception as e:
-        return ExecResult(False, None, f"RuntimeError: {e}")
-
-    # Check test assertions
-    assertions = test_assertions or []
-    for ass in assertions:
-        target = ass.get("target")
-        prop = ass.get("prop", "").lower().strip()
-        expected = ass.get("val")
-        tol = ass.get("tol", 1e-6)
-
-        try:
-            actual = fdtd.getnamed(target, prop)
-        except Exception as e:
-            return ExecResult(
-                False,
-                None,
-                f"assertion failed: could not query '{target}.{prop}': {e}",
-            )
-
-        # Numeric check
-        if isinstance(expected, (int, float)):
-            try:
-                act_num = float(actual)
-                if abs(act_num - expected) > tol:
-                    return ExecResult(
-                        False,
-                        None,
-                        f"assertion failed: '{target}.{prop}' expected {expected} (+/- {tol}), got {actual}",
-                    )
-                continue
-            except (ValueError, TypeError):
-                pass
-
-        # String check
-        if isinstance(expected, str) and isinstance(actual, str):
-            if actual.strip().lower() != expected.strip().lower():
-                return ExecResult(
-                    False,
-                    None,
-                    f"assertion failed: '{target}.{prop}' expected '{expected}', got '{actual}'",
-                )
-        elif actual != expected:
-            return ExecResult(
-                False,
-                None,
-                f"assertion failed: '{target}.{prop}' expected {expected}, got {actual}",
-            )
-
+    err = execute_real_lumerical(code, timeout)
+    if err:
+        return ExecResult(False, None, err)
+    err = check_real_assertions(test_assertions, timeout)
+    if err:
+        return ExecResult(False, None, err)
     return ExecResult(True, [("ok",)], None)
 
 
@@ -472,10 +697,15 @@ def run_lumerical(
     # Check test assertions
     assertions = test_assertions or []
     for ass in assertions:
+        if ass.get("type") == "expr":
+            return ExecResult(
+                False,
+                None,
+                f"assertion failed: expression assertion '{ass.get('expr')}' requires the real Lumerical engine",
+            )
         target = ass.get("target")
         prop = ass.get("prop", "").lower().strip()
         expected = ass.get("val")
-        tol = ass.get("tol", 1e-6)
 
         if target not in sim.objects:
             return ExecResult(
@@ -492,26 +722,12 @@ def run_lumerical(
                 f"assertion failed: property '{prop}' was not set on object '{target}'",
             )
 
-        actual = obj[prop]
-        if isinstance(expected, (int, float)) and isinstance(actual, (int, float)):
-            if abs(actual - expected) > tol:
-                return ExecResult(
-                    False,
-                    None,
-                    f"assertion failed: '{target}.{prop}' expected {expected} (+/- {tol}), got {actual}",
-                )
-        elif isinstance(expected, str) and isinstance(actual, str):
-            if actual.strip().lower() != expected.strip().lower():
-                return ExecResult(
-                    False,
-                    None,
-                    f"assertion failed: '{target}.{prop}' expected '{expected}', got '{actual}'",
-                )
-        elif actual != expected:
-            return ExecResult(
-                False,
-                None,
-                f"assertion failed: '{target}.{prop}' expected {expected}, got {actual}",
-            )
+        err = _compare(f"{target}.{prop}", expected, obj[prop], ass)
+        if err:
+            return ExecResult(False, None, err)
 
     return ExecResult(True, [(len(sim.objects),)], None)
+
+
+if __name__ == "__main__" and sys.argv[1:] == ["--lumerical-worker"]:
+    _worker_main()
