@@ -17,7 +17,7 @@ from .util import EXACT_NOTE, NM, OPENERS, UM, E, grid, hl, lit, num, pick, task
 
 CAT_FILM = "simulation_thin_films"
 CAT_SPEC = "simulation_spectra"
-TIMEOUT = 240
+TIMEOUT = 90
 
 SETUP_TXT = (
     "Simulation setup: a 2D FDTD region (default name 'FDTD') centered at the origin, x span 100 nm with "

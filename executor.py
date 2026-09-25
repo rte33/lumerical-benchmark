@@ -419,6 +419,45 @@ def _to_plain(value: Any) -> Any:
     return value
 
 
+_RESOURCE_BACKUP = os.path.join(os.path.expanduser("~"), ".lumbench_fdtd_processes_backup.json")
+
+
+def _use_single_solver_process(fdtd):
+    """Run benchmark simulations as one MPI process; returns a function restoring the user's setting.
+
+    Benchmark simulations are tiny 2D problems: split across N MPI ranks they are slower
+    than on one, and a single busy core (any other program) throttles every rank. The
+    FDTD resource configuration is global, so the original value is written to a backup
+    file first; if a worker is killed before restoring it, the next worker restores the
+    value from the backup instead of treating the temporary "1" as the original.
+    Set LUMBENCH_KEEP_RESOURCES=1 to leave the configuration untouched.
+    """
+    if os.environ.get("LUMBENCH_KEEP_RESOURCES") == "1":
+        return lambda: None
+    try:
+        import json
+        if os.path.exists(_RESOURCE_BACKUP):
+            with open(_RESOURCE_BACKUP, encoding="utf-8") as f:
+                original = json.load(f)["processes"]
+        else:
+            fdtd.eval(f'{_BENCH_VAR} = getresource("FDTD", 1, "processes");')
+            original = str(fdtd.getv(_BENCH_VAR))
+            with open(_RESOURCE_BACKUP, "w", encoding="utf-8") as f:
+                json.dump({"processes": original}, f)
+        fdtd.eval('setresource("FDTD", 1, "processes", "1");')
+    except Exception:
+        return lambda: None
+
+    def restore():
+        try:
+            fdtd.eval(f'setresource("FDTD", 1, "processes", "{original}");')
+            os.remove(_RESOURCE_BACKUP)
+        except Exception:
+            pass
+
+    return restore
+
+
 def _worker_main() -> None:
     """Entry point of the Lumerical worker process."""
     from multiprocessing.connection import Listener
@@ -438,6 +477,7 @@ def _worker_main() -> None:
     except Exception as e:
         conn.send(("err", f"could not start Lumerical: {e}"))
         return
+    restore_processes = _use_single_solver_process(fdtd)
     conn.send(("ok", "ready"))
 
     def failure(e: Exception) -> tuple:
@@ -476,6 +516,7 @@ def _worker_main() -> None:
                 reply = failure(e)
             conn.send(reply)
     finally:
+        restore_processes()
         try:
             fdtd.close()
         except Exception:

@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import hashlib
 import json
 import os
 import random
@@ -182,6 +183,19 @@ def main():
     cands = generate(args.per_family, args.seed, fams, tiers)
     print(f"Generated {len(cands)} candidate tasks; gating on the real Lumerical engine...", flush=True)
 
+    # Gate results are checkpointed so an interrupted build resumes where it stopped.
+    os.makedirs(args.out_dir, exist_ok=True)
+    cache_path = os.path.join(args.out_dir, "gate_cache.jsonl")
+    cache = {}
+    if os.path.exists(cache_path):
+        with open(cache_path, encoding="utf-8") as f:
+            for line in f:
+                if line.strip():
+                    rec = json.loads(line)
+                    cache[rec["key"]] = rec
+        print(f"Resuming: {len(cache)} gate results cached in {cache_path}", flush=True)
+    cache_f = open(cache_path, "a", encoding="utf-8", newline="\n")
+
     kept, rejected = [], []
     reasons = Counter()
     kept_per_family = Counter()
@@ -189,7 +203,17 @@ def main():
     for i, t in enumerate(cands, 1):
         if kept_per_family[t["family"]] >= fam_target[t["family"]]:
             continue  # family already full
-        ok, why, info = gate(t)
+        key = hashlib.sha1(json.dumps([t["question"], t["gold_code"], t["test_assertions"]],
+                                      sort_keys=True).encode()).hexdigest()
+        if key in cache:
+            ok, why, info = cache[key]["ok"], cache[key]["why"], cache[key]["info"]
+            t = cache[key]["task"]
+        else:
+            ts = time.time()
+            ok, why, info = gate(t)
+            cache_f.write(json.dumps({"key": key, "ok": ok, "why": why, "info": info, "task": t}) + "\n")
+            cache_f.flush()
+            print(f"    . {i} {t['family']} {'ok' if ok else 'REJ'} {time.time() - ts:.1f}s", flush=True)
         t["_gate"] = info
         if ok:
             kept.append(t)
