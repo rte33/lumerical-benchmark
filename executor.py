@@ -453,12 +453,17 @@ def _worker_main() -> None:
             try:
                 if op == "exec":
                     fdtd.newproject()
+                    # newproject keeps script variables; clear them so results cannot leak between tasks
+                    fdtd.eval("clear;")
                     fdtd.eval(_inject_save_guard(arg, save_path))
                     reply = ("ok", None)
                 elif op == "getnamed":
                     reply = ("ok", _to_plain(fdtd.getnamed(*arg)))
                 elif op == "expr":
-                    fdtd.eval(f"{_BENCH_VAR} = {arg};")
+                    setup, expr = arg if isinstance(arg, (list, tuple)) else ("", arg)
+                    if setup:
+                        fdtd.eval(setup)
+                    fdtd.eval(f"{_BENCH_VAR} = {expr};")
                     reply = ("ok", _to_plain(fdtd.getv(_BENCH_VAR)))
                 elif op == "eval":
                     fdtd.eval(arg)
@@ -620,6 +625,8 @@ def check_real_assertions(test_assertions: list[dict] | None, timeout: float = 1
       {"target": obj, "prop": p, "val": v}             -- getnamed(obj, p) == v
       {"type": "expr", "expr": "<lsf expr>", "val": v}  -- value of an LSF expression, e.g.
           'getnamednumber("hole")' or a result variable left by the script ('T1550').
+          An optional "setup" string of LSF statements runs first, which allows
+          order-independent aggregate checks over many objects (use benchzz* names).
     Numeric checks accept "tol" (absolute, default 1e-6) and/or "rtol" (relative).
     """
     for ass in test_assertions or []:
@@ -627,7 +634,7 @@ def check_real_assertions(test_assertions: list[dict] | None, timeout: float = 1
         try:
             if ass.get("type") == "expr":
                 label = ass["expr"]
-                status, actual = real_lumerical_request("expr", ass["expr"], timeout)
+                status, actual = real_lumerical_request("expr", (ass.get("setup", ""), ass["expr"]), timeout)
                 if status != "ok":
                     return f"assertion failed: could not evaluate '{label}': {actual}"
             else:
